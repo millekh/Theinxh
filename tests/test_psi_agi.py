@@ -17,7 +17,7 @@ def test_compute_psi_agi_basic():
     result = compute_psi_agi(price_df, prediction_df, window=3)
 
     assert "Ψ_AGI_Score" in result.columns
-    expected_vol = price_df["Normalized"].rolling(window=3).std().fillna(method="bfill").iloc[-1]
+    expected_vol = price_df["Normalized"].rolling(window=3).std().bfill().iloc[-1]
     latest_quantum = price_df["Quantum_Output"].iloc[-1]
     expected_scores = [
         (latest_quantum * pred) / (1 + expected_vol)

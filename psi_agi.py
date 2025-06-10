@@ -1,5 +1,4 @@
 import pandas as pd
-from typing import Optional
 
 
 def compute_psi_agi(price_df: pd.DataFrame, prediction_df: pd.DataFrame, *, window: int = 10) -> pd.DataFrame:
@@ -25,7 +24,7 @@ def compute_psi_agi(price_df: pd.DataFrame, prediction_df: pd.DataFrame, *, wind
     if "Predicted_Normalized_Price" not in prediction_df:
         raise KeyError("prediction_df must contain 'Predicted_Normalized_Price' column")
 
-    rolling_volatility = price_df["Normalized"].rolling(window=window).std().fillna(method="bfill")
+    rolling_volatility = price_df["Normalized"].rolling(window=window).std().bfill()
 
     latest_quantum = price_df["Quantum_Output"].iloc[-1]
     latest_volatility = rolling_volatility.iloc[-1]
