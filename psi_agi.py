@@ -29,15 +29,12 @@ def compute_psi_agi(price_df: pd.DataFrame, prediction_df: pd.DataFrame, *, wind
     latest_quantum = price_df["Quantum_Output"].iloc[-1]
     latest_volatility = rolling_volatility.iloc[-1]
 
-    predicted_prices = prediction_df["Predicted_Normalized_Price"].values
-
-    psi_agi_scores = [
-        (latest_quantum * pred) / (1 + latest_volatility)
-        for pred in predicted_prices
-    ]
-
     prediction_df = prediction_df.copy()
-    prediction_df["Ψ_AGI_Score"] = psi_agi_scores
+    prediction_df["Ψ_AGI_Score"] = (
+        latest_quantum
+        * prediction_df["Predicted_Normalized_Price"]
+        / (1 + latest_volatility)
+    )
     return prediction_df
 
 
