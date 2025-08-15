@@ -7,6 +7,7 @@ TICE Quantum Sentinel - Final Presentation Edition
 - NSA/DARPA CSfC Tactics: Anonymized/encrypted trust matrices (AES-256 FIPS if cryptography installed), strategic adaptive difficulty for resilience, secure logging for audits. MoU-ready prototype: Anonymized insider tactics, $500K-$2M award potential under Dr. John Burke's oversight.
 - Features: Unified adaptive TICE/Curve engine (Λ gated by C, auto-tunes on difficulty signals like high flips/negative bends/low acc). Quantum-inspired entropy, multi-agent learning on synthetic tasks, hardened execution (no failures).
 - Presentation Notes: Run with defaults for demo (5 epochs, 3 agents, 0.2 flip). Scale to 10 agents/10 epochs for stress test. Logs show zero errors. Questions? Contact kevin@qbondnetwork.com.
+ - Encryption Required: This script aborts if the ``cryptography`` package is missing to ensure FIPS‑level trust‑matrix protection.
 """
 
 import math, random
@@ -23,7 +24,9 @@ try:
     _HAS_CRYPTO = True
 except ImportError:
     _HAS_CRYPTO = False
-    print("Note: cryptography lib not found. Phi matrices unencrypted (install for full NSA compliance).")
+    print(
+        "ERROR: cryptography lib not found. Install 'cryptography' for FIPS compliant encryption before running."
+    )
 
 # ------------------------------ reproducibility ------------------------------
 SEED = 42
@@ -195,6 +198,10 @@ class RunResult:
     lambda_forecast: List[float]
 
 def run_sim(epochs: int = 5, base_agents: int = 3, adversarial_flip_rate: float = 0.2):
+    if not _HAS_CRYPTO:
+        raise RuntimeError(
+            "cryptography package is required for EU AI Act/CSfC compliance."
+        )
     set_seed()
     device = "cpu"
     engine = AdaptiveCurvatureEngine(agents=base_agents)

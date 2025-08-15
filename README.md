@@ -85,4 +85,7 @@ For compliance-focused demos with adaptive difficulty and secure logging run:
 python tice_multi_agent_sim_final_presentation.py
 ```
 
-This variant encrypts trust matrices when ``cryptography`` is installed and adapts agent counts based on curvature and adversarial signals.
+This variant requires ``cryptography`` for FIPS-compliant encryption and adapts
+agent counts based on curvature and adversarial signals. A ready-to-run Colab
+notebook is provided in ``tice_final_presentation_demo.ipynb`` which installs
+the dependency and executes ``run_sim()``.
