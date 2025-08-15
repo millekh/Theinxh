@@ -35,6 +35,10 @@ try:
     from prometheus_client import Gauge
 except Exception:
     Gauge = None
+try:
+    import oqs  # post-quantum cryptography
+except Exception:
+    oqs = None
 
 # ------------------------------ reproducibility ------------------------------
 SEED = 42
@@ -43,6 +47,23 @@ def set_seed(seed: int = SEED):
     torch.manual_seed(seed); torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def pqc_encrypt(data: bytes) -> Tuple[bytes, Optional[bytes], Optional[bytes]]:
+    """Encrypt byte data with a post‑quantum KEM if available.
+
+    Returns (ciphertext, public_key, encapsulated_key). Falls back to
+    returning the original data when the `oqs` library is missing.
+    """
+    if oqs is None:
+        return data, None, None
+    kem = oqs.KeyEncapsulation("Kyber512")
+    public_key = kem.generate_keypair()
+    ciphertext, shared_secret = kem.encap_secret()
+    # Use shared secret to XOR‑encrypt data (demonstration only)
+    key = (shared_secret * (len(data) // len(shared_secret) + 1))[:len(data)]
+    encrypted = bytes(a ^ b for a, b in zip(data, key))
+    return encrypted, public_key, ciphertext
 
 # ------------------------------ synthetic task -------------------------------
 def make_batch(n: int = 96, img_hw: int = 28, device: str = "cpu") -> Tuple[torch.Tensor, torch.Tensor]:
@@ -264,10 +285,14 @@ class RunResult:
     lambda_forecast: List[float]
     dao_ledger: Dict[str, float]
     psi_last: np.ndarray
+    phi_ciphertext: Optional[bytes] = None
 
 def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2,
-            thr: float = 0.15) -> RunResult:
-    set_seed(); device = "cpu"
+            thr: float = 0.15, device: Optional[str] = None) -> RunResult:
+    set_seed()
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(device)
     nets = [Agent().to(device) for _ in range(agents)]
     optimizers = [torch.optim.AdamW(n.parameters(), lr=1e-3, weight_decay=1e-4) for n in nets]
     ce = nn.CrossEntropyLoss()
@@ -337,6 +362,7 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
     # Final Φ, curvature, C
     E_final = np.stack([n.embedding().detach().cpu().numpy() for n in nets], axis=0)
     Phi = build_phi_from_embeddings(E_final)
+    enc_phi, pk, ct = pqc_encrypt(Phi.tobytes())
     orc_forman = forman_ricci_orc(Phi, thr=thr)
     orc_ollivier = orc_ollivier_sinkhorn(Phi, thr=thr)
     C_val = compute_curve_index(Phi, threshold=thr, signed=True)
@@ -363,7 +389,8 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
         phi_last=Phi,
         lambda_forecast=lambda_fc,
         dao_ledger={f"agent_{i}": float(v) for i, v in enumerate(dao_xp)},
-        psi_last=psi_last
+        psi_last=psi_last,
+        phi_ciphertext=enc_phi
     )
 
 # --------------- optional glyph/dashboard (if matplotlib) --------------------
