@@ -76,3 +76,13 @@ python tice_multi_agent_sim_quantum_sentinel_plus.py
 The script trains small convolutional agents on synthetic images, computes
 advanced curvature metrics (Forman and Ollivier–Ricci), forecasts future
 ``Λ`` values, and can export a dashboard image summarising the run.
+
+## Final Presentation Simulation
+
+For compliance-focused demos with adaptive difficulty and secure logging run:
+
+```bash
+python tice_multi_agent_sim_final_presentation.py
+```
+
+This variant encrypts trust matrices when ``cryptography`` is installed and adapts agent counts based on curvature and adversarial signals.
