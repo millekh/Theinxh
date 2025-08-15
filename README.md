@@ -62,3 +62,17 @@ service with external frameworks:
 
 These connectors demonstrate how the microservice can plug into different AI
 stacks.
+
+## Quantum Sentinel Simulation
+
+For a larger multi-agent playground complete with optional FastAPI and dashboard
+generation, run the quantum sentinel script:
+
+```bash
+pip install torch
+python tice_multi_agent_sim_quantum_sentinel_plus.py
+```
+
+The script trains small convolutional agents on synthetic images, computes
+advanced curvature metrics (Forman and Ollivier–Ricci), forecasts future
+``Λ`` values, and can export a dashboard image summarising the run.
