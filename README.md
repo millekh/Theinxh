@@ -77,6 +77,16 @@ The script trains small convolutional agents on synthetic images, computes
 advanced curvature metrics (Forman and Ollivier–Ricci), forecasts future
 ``Λ`` values, and can export a dashboard image summarising the run.
 
+Recent additions include:
+
+- **Preference‑conditioned embeddings** – agents can be biased toward human or
+  inverse‑RL preferences before curvature analysis.
+- **Curvature audit logs** – each training epoch records ``Λ``, ``Ω`` and
+  ``Ξχ`` values alongside lightweight ``why`` trees that justify agent
+  predictions.
+- **Θ^human interpretability score** – pass in human ratings and obtain a
+  normalised interpretability metric for the run.
+
 ## Final Presentation Simulation
 
 For compliance-focused demos with adaptive difficulty and secure logging run:

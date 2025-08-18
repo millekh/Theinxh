@@ -1,6 +1,6 @@
 import math, random, io, json
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Sequence
 
 import numpy as np
 import torch
@@ -39,6 +39,7 @@ try:
     import oqs  # post-quantum cryptography
 except Exception:
     oqs = None
+from metrics import preference_condition_embeddings, theta_human_score
 
 # ------------------------------ reproducibility ------------------------------
 SEED = 42
@@ -139,6 +140,17 @@ def quantum_entropy_bits(p: np.ndarray, gamma: float = 0.25, eps: float = 1e-9) 
 
 def omega_from_entropy(xi_bits: float, T: float = 2.0) -> float:
     return float(math.exp(-xi_bits / max(T, 1e-9)))
+
+
+def predict_justification(logits: torch.Tensor, topk: int = 3) -> Dict[int, float]:
+    """Return a lightweight justification tree for model decisions.
+
+    The tree is represented as a mapping from class index to probability for
+    the top ``k`` predictions.
+    """
+    probs = torch.softmax(logits.detach(), dim=-1)
+    vals, idx = probs.topk(min(topk, probs.numel()))
+    return {int(i): float(v) for i, v in zip(idx.cpu().numpy(), vals.cpu().numpy())}
 
 def build_phi_from_embeddings(embs: np.ndarray) -> np.ndarray:
     E = embs
@@ -285,10 +297,14 @@ class RunResult:
     lambda_forecast: List[float]
     dao_ledger: Dict[str, float]
     psi_last: np.ndarray
+    audit_log: List[Dict[str, float]]
+    theta_human: Optional[float]
     phi_ciphertext: Optional[bytes] = None
 
 def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2,
-            thr: float = 0.15, device: Optional[str] = None) -> RunResult:
+            thr: float = 0.15, device: Optional[str] = None,
+            preferences: Optional[Sequence[float]] = None,
+            human_ratings: Optional[Sequence[float]] = None) -> RunResult:
     set_seed()
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -299,12 +315,13 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
 
     acc_hist, omega_hist, lambda_hist, xi_hist = [], [], [], []
     dao_xp = np.zeros(agents, dtype=float)  # DAO ledger
+    audit_log: List[Dict[str, float]] = []
 
     for ep in range(epochs):
         X, y = make_batch(n=96, device=device)
         y_adv = flip_labels(y, adversarial_flip_rate, 10) if (ep % 2 == 0) else y
 
-        embs = []; xi_bits_epoch = []
+        embs = []; xi_bits_epoch = []; justifications_epoch = []
 
         for ai, (net, opt) in enumerate(zip(nets, optimizers)):
             net.train()
@@ -317,6 +334,7 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
             embs.append(net.embedding().detach().cpu().numpy())
             pmean = torch.softmax(logits, dim=-1).mean(dim=0).detach().cpu().numpy()
             xi_bits_epoch.append(quantum_entropy_bits(pmean))
+            justifications_epoch.append(predict_justification(logits.mean(dim=0)))
 
         # epoch metrics (eval, consistent BN)
         with torch.no_grad():
@@ -327,6 +345,8 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
         xi_mean = float(np.mean(xi_bits_epoch))
         omega = omega_from_entropy(xi_mean, T=2.0)
         E = np.stack(embs, axis=0)
+        if preferences is not None:
+            E = preference_condition_embeddings(E, preferences)
         lam = multi_agent_lambda(E)
 
         # DAO XP update (reward low entropy & positive curvature increment)
@@ -335,6 +355,7 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
 
         acc_hist.append(acc_epoch); omega_hist.append(omega)
         lambda_hist.append(lam);    xi_hist.append(xi_mean)
+        audit_log.append({"epoch": ep, "lambda": lam, "omega": omega, "xi": xi_mean, "why": justifications_epoch})
 
         # Trust-weighted FedAvg each epoch (stabilization)
         Phi_tmp = build_phi_from_embeddings(E)
@@ -375,6 +396,7 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
 
     # Forecast next Λ
     lambda_fc = arima_or_linear_forecast(lambda_hist, steps=5)
+    theta_h = theta_human_score(human_ratings, scale=5.0) if human_ratings is not None else None
 
     return RunResult(
         proof_coherence=acc_hist,
@@ -390,6 +412,8 @@ def run_sim(epochs: int = 5, agents: int = 3, adversarial_flip_rate: float = 0.2
         lambda_forecast=lambda_fc,
         dao_ledger={f"agent_{i}": float(v) for i, v in enumerate(dao_xp)},
         psi_last=psi_last,
+        audit_log=audit_log,
+        theta_human=theta_h,
         phi_ciphertext=enc_phi
     )
 

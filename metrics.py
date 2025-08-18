@@ -50,4 +50,44 @@ def forecast_scg(lambdas: Sequence[float], dt: float = 1.0) -> float:
     return float((lam[-1] - lam[0]) / (dt * (len(lam) - 1)))
 
 
-__all__ = ["curve_index", "compute_xi_chi", "forecast_scg"]
+def preference_condition_embeddings(embeddings: np.ndarray, preferences: Sequence[float]) -> np.ndarray:
+    """Modulate agent embeddings by human or IRL preferences.
+
+    Parameters
+    ----------
+    embeddings : np.ndarray
+        Array of shape ``[agents, dim]`` containing agent embeddings.
+    preferences : Sequence[float]
+        Preference weights for each embedding dimension.
+
+    Returns
+    -------
+    np.ndarray
+        Preference‑conditioned embeddings.
+    """
+    emb = np.asarray(embeddings, dtype=float)
+    pref = np.asarray(preferences, dtype=float)
+    if pref.shape[-1] != emb.shape[-1]:
+        raise ValueError("Preference length must match embedding dimension")
+    return emb * pref
+
+
+def theta_human_score(ratings: Sequence[float], scale: float = 5.0) -> float:
+    """Compute the Θ^human interpretability score.
+
+    The score is the mean of human ratings normalised by the rating ``scale``
+    (e.g., 5 for a 1–5 Likert scale).
+    """
+    r = np.asarray(ratings, dtype=float)
+    if r.size == 0:
+        raise ValueError("ratings must be non-empty")
+    return float(np.clip(r.mean() / scale, 0.0, 1.0))
+
+
+__all__ = [
+    "curve_index",
+    "compute_xi_chi",
+    "forecast_scg",
+    "preference_condition_embeddings",
+    "theta_human_score",
+]
